@@ -1,13 +1,6 @@
 import multer from 'multer';
 import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
-import fs from 'fs';
 import { config } from '../config';
-
-// Ensure upload directory exists
-if (!fs.existsSync(config.UPLOAD_DIR)) {
-  fs.mkdirSync(config.UPLOAD_DIR, { recursive: true });
-}
 
 const storage = multer.memoryStorage();
 
