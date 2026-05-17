@@ -18,7 +18,7 @@ export class OCRService {
   validateIndianPlate(text: string) {
     // Regex for Indian Plate formats: MH12AB1234, DL01C4321, etc.
     // Standard: 2 letters, 2 digits, 1 or 2 letters, 4 digits
-    const plateRegex = /[A-Z]{2}[0-9]{2}[A-Z]{1,2}[0-9]{4}/g;
+    const plateRegex = /[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{4}/g;
     const matches = text.toUpperCase().replace(/[^A-Z0-9]/g, '').match(plateRegex);
     
     return {
