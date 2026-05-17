@@ -1,0 +1,1 @@
+import './workers/processing.worker';

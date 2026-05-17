@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum ProcessingStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Media {
+  id            String           @id @default(auto()) @map("_id") @db.ObjectId
+  filename      String
+  originalName  String
+  mimeType      String
+  size          Int
+  status        ProcessingStatus @default(PENDING)
+  failureReason String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  analysis  Analysis?
+  auditLogs AuditLog[]
+
+  @@map("media")
+}
+
+model Analysis {
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  mediaId String @unique @db.ObjectId
+  media   Media  @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  blurScore       Float?
+  blurConfidence  Float?
+  brightnessScore Float?
+  isDuplicate     Boolean @default(false)
+  perceptualHash  String?
+  ocrResult       String?
+  plateNumber     String?
+  isPlateValid    Boolean @default(false)
+  isScreenshot    Boolean @default(false)
+  isTampered      Boolean @default(false)
+  dimensions      Json? // { width, height }
+
+  rawResult Json? // All analysis details in JSON
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("analysis_results")
+}
+
+model AuditLog {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  mediaId   String   @db.ObjectId
+  media     Media    @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  action    String
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}
