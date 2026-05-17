@@ -1,10 +1,13 @@
-import { createWorker } from 'tesseract.js';
+import { createWorker, PSM } from 'tesseract.js';
 import { logger } from '../../../config/logger';
 
 export class OCRService {
   async extractText(imagePath: string): Promise<string> {
     const worker = await createWorker('eng');
     try {
+      await worker.setParameters({
+        tessedit_pageseg_mode: PSM.SPARSE_TEXT,
+      });
       const { data: { text } } = await worker.recognize(imagePath);
       return text.trim();
     } catch (error) {
@@ -16,9 +19,9 @@ export class OCRService {
   }
 
   validateIndianPlate(text: string) {
-    // Regex for Indian Plate formats: MH12AB1234, DL01C4321, etc.
-    // Standard: 2 letters, 2 digits, 1 or 2 letters, 4 digits
-    const plateRegex = /[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{4}/g;
+    // Regex for Indian Plate formats allowing OCR errors: MH12AB1234, DL01C4321
+    // Allows 0 instead of Q/O in series, and letters instead of numbers in digits
+    const plateRegex = /[A-Z]{2}[0-9OIQ]{1,2}[A-Z0-9]{1,3}[0-9OIZSB]{4}/g;
     const matches = text.toUpperCase().replace(/[^A-Z0-9]/g, '').match(plateRegex);
     
     return {
