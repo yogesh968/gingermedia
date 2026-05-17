@@ -4,11 +4,22 @@ import { IMAGE_PROCESSING_QUEUE } from '../queues/processing.queue';
 import { prisma } from '../prisma/client';
 import { AnalysisService } from '../modules/analysis/analysis.service';
 import { logger } from '../config/logger';
-import axios from 'axios';
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { config } from '../config';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { Readable } from 'stream';
+
+const s3Client = new S3Client({
+  region: config.AWS_REGION || 'us-east-1',
+  credentials: {
+    accessKeyId: config.AWS_ACCESS_KEY_ID || '',
+    secretAccessKey: config.AWS_SECRET_ACCESS_KEY || '',
+    ...(config.AWS_SESSION_TOKEN && { sessionToken: config.AWS_SESSION_TOKEN }),
+  },
+});
 
 const analysisService = new AnalysisService();
 
@@ -26,10 +37,18 @@ export const processingWorker = new Worker(
         data: { status: 'PROCESSING' },
       });
 
-      // Download the remote S3 URL to a temporary file for analysis
-      const response = await axios.get(filePath, { responseType: 'arraybuffer' });
+      // Download image from S3 using SDK (handles private buckets + session tokens)
+      const s3Key = filePath.split('.amazonaws.com/')[1];
+      const s3Response = await s3Client.send(new GetObjectCommand({
+        Bucket: config.AWS_BUCKET_NAME || 'ginger-media-bucket',
+        Key: s3Key,
+      }));
+      const chunks: Buffer[] = [];
+      for await (const chunk of s3Response.Body as Readable) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
       const tempFilePath = path.join(os.tmpdir(), `${uuidv4()}.jpg`);
-      fs.writeFileSync(tempFilePath, Buffer.from(response.data));
+      fs.writeFileSync(tempFilePath, Buffer.concat(chunks));
 
       // Run Analysis using the temporary file
       let results;

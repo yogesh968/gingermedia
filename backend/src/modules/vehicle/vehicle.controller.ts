@@ -6,12 +6,8 @@ export const getStatus = async (req: Request, res: Response) => {
 
   const media = await prisma.media.findUnique({
     where: { id },
-    select: {
-      id: true,
-      status: true,
-      failureReason: true,
-      createdAt: true,
-      updatedAt: true,
+    include: {
+      analysis: true,
     },
   });
 
