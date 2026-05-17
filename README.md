@@ -1,123 +1,159 @@
-# Intelligent Media Processing Pipeline
+<div align="center">
+  
+# 🧠 Intelligent Media Processing Pipeline
+  
+**A production-grade, asynchronous AI pipeline for validating and analyzing vehicle imagery at scale.**
 
-A robust, production-grade backend system for vehicle image processing and AI-driven analysis. Built with Clean Architecture, TypeScript, and high-performance asynchronous processing.
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)](https://mongodb.com/)
+[![Redis](https://img.shields.io/badge/redis-%23DD0031.svg?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 
-## 🚀 Project Overview
+</div>
 
-This system provides a complete pipeline for uploading vehicle images, performing automated quality checks (blur, brightness), extracting metadata via OCR, and detecting anomalies like screenshots or tampering.
+---
 
-### Key Features
-- **Clean Architecture**: Modular and scalable design separating business logic from infrastructure.
-- **Async Processing**: BullMQ powered by Redis for reliable, background image analysis.
-- **AI Analysis**: 
-    - Laplacian Blur Detection.
-    - Grayscale Brightness Analysis.
-    - Perceptual Hashing for Duplicate Detection.
-    - Tesseract-based OCR for Vehicle Number Extraction.
-    - Heuristics for Screenshot and Tampering detection.
-- **Production Ready**: Structured logging (Pino), OpenAPI docs (Swagger), Dockerized setup, and comprehensive error handling.
+## 🚀 Overview
 
-## 🏗 Architecture Diagram
+The **Intelligent Media Processing Pipeline** is a cloud-native, highly scalable monorepo application engineered to automate the quality assurance of uploaded vehicle images. By leveraging advanced computer vision heuristics and asynchronous background workers, the system can instantly detect image blurriness, extract license plate text via OCR, flag exact duplicates, and detect metadata tampering—all without blocking the end user's experience.
+
+## ✨ Key Features
+
+- **Asynchronous AI Processing**: Utilizes `BullMQ` and `Redis` to offload heavy image analysis tasks (OCR, Hashing, Convolutions) to background workers.
+- **Premium User Interface**: Built with **Next.js 15 App Router** and **Shadcn UI**, featuring a responsive, dynamic Dark Mode dashboard with real-time status polling.
+- **Advanced Heuristics Engine**:
+  - **Laplacian Blur Detection**: Mathematically measures image sharpness and edge density.
+  - **Tesseract OCR**: Specifically tuned to extract and validate alphanumeric vehicle registration plates.
+  - **Perceptual Hashing (aHash)**: Generates 64-bit image fingerprints to detect duplicate uploads regardless of file name or compression.
+  - **Tamper & Screenshot Detection**: Analyzes aspect ratios and EXIF footprints to catch unoriginal images.
+- **Cloud-Native Storage**: Integrates directly with **AWS S3** to handle ephemeral environments seamlessly.
+- **Robust Persistence Layer**: Powered by **MongoDB** and **Prisma ORM** for highly flexible, document-oriented data storage.
+
+---
+
+## 🏗 System Architecture
+
+The repository is structured as a monorepo containing decoupled `frontend` and `backend` services.
 
 ```mermaid
 graph TD
-    Client[Client/Frontend] -->|POST /upload| API[Express API]
-    API -->|Create Record| DB[(PostgreSQL)]
-    API -->|Add Job| Queue[BullMQ / Redis]
-    Queue -->|Consume| Worker[Background Worker]
-    Worker -->|Process| Analysis[Analysis Services]
-    Analysis -->|Sharp/Tesseract| Image[Image Processing]
-    Worker -->|Update Results| DB
-    Client -->|GET /status/:id| API
-    Client -->|GET /results/:id| API
+    UI[Next.js Frontend] -->|POST /upload| API[Express.js Backend API]
+    API -->|Save Buffer| S3[(AWS S3 Bucket)]
+    API -->|Create Record| DB[(MongoDB)]
+    API -->|Add Job| Queue[Redis Queue]
+    
+    Queue -->|Consume Job| Worker[Background Worker]
+    Worker -->|Download Image| S3
+    Worker -->|Analyze Image| AI[Sharp & Tesseract Services]
+    Worker -->|Write Results| DB
+    
+    UI -->|Poll GET /status| API
 ```
 
-## 🛠 Tech Stack
+---
 
-- **Backend**: Node.js, TypeScript, Express.js
-- **Database**: PostgreSQL with Prisma ORM
-- **Queue**: BullMQ + Redis
-- **Image Processing**: Sharp, Tesseract.js
-- **Validation**: Zod
+## 💻 Technology Stack
+
+### Frontend (User Interface)
+- **Framework**: Next.js 15 (React 19)
+- **Styling**: Tailwind CSS & Shadcn UI
+- **State & Fetching**: React Query & Axios
+- **Animations**: Framer Motion
+- **Interactions**: React Dropzone for fluid file uploads
+
+### Backend (API & Workers)
+- **Runtime**: Node.js & TypeScript
+- **Framework**: Express.js (Clean Architecture Pattern)
+- **Database**: MongoDB with Prisma ORM
+- **Queueing**: BullMQ & Redis
+- **Image Processing**: Sharp (libvips) & Tesseract.js
+- **Storage**: AWS SDK (S3)
 - **Logging**: Pino
-- **DevOps**: Docker, Docker Compose
-- **Testing**: Jest, Supertest
 
-## 📋 Processing Flow
+---
 
-1.  **Ingestion**: `POST /api/v1/upload` accepts an image and returns a `processingId`.
-2.  **Persistence**: Image metadata is stored in PostgreSQL as `PENDING`.
-3.  **Job Queueing**: A background job is dispatched to BullMQ.
-4.  **Analysis**: The worker picks up the job and executes:
-    *   **Blur Check**: Calculates Laplacian variance.
-    *   **Brightness**: Checks mean pixel intensity.
-    *   **OCR**: Extracts text and validates against Indian plate formats.
-    *   **Hashing**: Generates a 64-bit perceptual hash.
-    *   **Heuristics**: Checks aspect ratios (screenshots) and metadata (software tags).
-5.  **Completion**: Database is updated with results, and the status is set to `COMPLETED`.
-
-## ⚙️ Queue Strategy & Failure Handling
-
-- **Retry Mechanism**: Exponential backoff (5s base, 3 attempts).
-- **Graceful Shutdown**: Workers listen for `SIGTERM` to finish current jobs.
-- **Atomicity**: DB updates are wrapped in Prisma transactions.
-- **Timeout Handling**: Job timeouts configured to prevent zombie processes.
-
-## 🤖 AI Usage Disclosure
-
-- **Blur Detection**: Uses mathematical convolution (Laplacian) to detect edge density.
-- **OCR**: Powered by Tesseract's LSTM-based engine.
-- **Duplicate Detection**: Uses Average Perceptual Hashing (aHash).
-- **Code Validation**: All AI-generated analysis heuristics were validated against standard computer vision benchmarks for vehicle imagery.
-
-## 🚀 Local Setup
+## 🛠 Setup & Installation
 
 ### Prerequisites
 - Node.js 18+
-- Docker & Docker Compose
-- Redis (optional for local non-docker)
-- PostgreSQL (optional for local non-docker)
+- A MongoDB Cluster (e.g., MongoDB Atlas)
+- A Redis Instance (e.g., Upstash or local Docker)
+- AWS S3 Bucket Credentials (or any S3-compatible storage)
 
-### Using Docker (Recommended)
+### 1. Backend Configuration
+Navigate to the backend directory and install dependencies:
 ```bash
-docker-compose up --build
+cd backend
+npm install
 ```
 
-### Manual Setup
-
-**Backend (API & Workers):**
-1.  `cd backend`
-2.  Install dependencies: `npm install`
-3.  Setup `.env` (refer `.env.example`)
-4.  Prisma setup: `npx prisma generate && npx prisma migrate dev`
-5.  Run Dev: `npm run dev` (Runs on port 3000)
-
-**Frontend (Next.js UI):**
-1.  `cd frontend`
-2.  Install dependencies: `npm install`
-3.  Run Dev: `npm run dev` (Runs on port 3001)
-
-## 📡 API Examples
-
-### Upload Image
+Configure your environment variables by copying the example file:
 ```bash
-curl -X POST http://localhost:3000/api/v1/upload \
-  -F "image=@vehicle.jpg"
+cp .env.example .env
 ```
 
-### Get Status
-```bash
-curl http://localhost:3000/api/v1/status/{id}
+Open `.env` and populate it with your cloud credentials:
+```env
+DATABASE_URL="mongodb+srv://<user>:<password>@<cluster>.mongodb.net/ginger_media"
+REDIS_HOST="your-redis-host.upstash.io"
+REDIS_PORT=6379
+REDIS_PASSWORD="your-secure-password"
+AWS_ACCESS_KEY_ID="your-aws-access-key"
+AWS_SECRET_ACCESS_KEY="your-aws-secret-key"
+AWS_REGION="us-east-1"
+AWS_BUCKET_NAME="your-bucket-name"
+FRONTEND_URL="http://localhost:3001"
 ```
 
-### Sample Response (Results)
+Push the Prisma schema to MongoDB and start the server:
+```bash
+npx prisma db push
+npx prisma generate
+npm run dev
+```
+*The backend API will start on `http://localhost:3000`.*
+
+### 2. Frontend Configuration
+Navigate to the frontend directory and install dependencies:
+```bash
+cd frontend
+npm install
+```
+
+Start the Next.js development server:
+```bash
+npm run dev
+```
+*The frontend dashboard will start on `http://localhost:3001`.*
+
+---
+
+## 📡 API Reference
+
+### `POST /api/v1/upload`
+Uploads an image buffer directly to S3 and queues it for asynchronous analysis.
+- **Content-Type**: `multipart/form-data`
+- **Body**: `image` (File - jpeg, png, webp)
+- **Response**:
 ```json
 {
-  "id": "uuid",
+  "processingId": "64f1b2c...a9d",
+  "message": "Image queued for processing successfully."
+}
+```
+
+### `GET /api/v1/status/:id`
+Retrieves the real-time processing status and, if completed, the full AI analysis report.
+- **Response**:
+```json
+{
+  "id": "64f1b2c...a9d",
   "status": "COMPLETED",
   "analysis": {
-    "blurScore": 1250.5,
-    "brightnessScore": 180,
+    "blurScore": 1420.5,
+    "brightnessScore": 165,
     "isPlateValid": true,
     "plateNumber": "MH12AB1234",
     "isScreenshot": false,
@@ -127,15 +163,14 @@ curl http://localhost:3000/api/v1/status/{id}
 }
 ```
 
-## 📐 Design Decisions
+---
 
-1.  **BullMQ vs. Simple Queue**: Chosen for its robust persistence and concurrency management.
-2.  **Sharp vs. Jimp**: Sharp uses `libvips`, making it 4-5x faster and significantly more memory-efficient.
-3.  **Modular Analysis**: Each check (blur, OCR, etc.) is a separate service, allowing for easy expansion (e.g., adding YOLOV8 for vehicle make/model).
+## 🔮 Roadmap & Future Enhancements
+- [ ] **WebSockets**: Transition from HTTP Polling (`React Query`) to WebSockets (`Socket.io`) for instant status updates.
+- [ ] **Deep Learning Models**: Integrate ONNX Runtime to support vehicle damage detection and make/model classification.
+- [ ] **Worker Autoscaling**: Implement Kubernetes (K8s) KEDA to scale background workers up and down based on BullMQ queue depth.
 
-## 🔮 Future Improvements
-
-- **Scalability**: Implement worker autoscaling based on queue depth.
-- **Advanced AI**: Integrate ONNX Runtime for deep-learning-based vehicle damage detection.
-- **Storage**: Move from local storage to S3/GCS with signed URLs.
-- **Monitoring**: Add Prometheus/Grafana metrics for job latency.
+---
+<div align="center">
+  <i>Built with precision for high-performance media analysis.</i>
+</div>
