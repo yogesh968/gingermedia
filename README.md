@@ -8,7 +8,7 @@
 
 <br/><br/>
 
-# ⚡ Ginger Media
+# Ginger Media
 ## Intelligent Vehicle Image Processing Pipeline
 
 > **A production-grade, cloud-native AI pipeline that validates, analyzes, and quality-assures vehicle imagery at scale — fully asynchronous, blazing fast, and built to handle real-world chaos.**
