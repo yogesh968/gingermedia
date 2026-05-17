@@ -11,12 +11,16 @@ export interface AnalysisResults {
     width: number;
     height: number;
   };
+  rawResult?: any;
+  ocrResult?: string;
+  perceptualHash?: string;
 }
 
 export interface ProcessingResponse {
   id: string;
   status: ProcessingStatus;
   analysis?: AnalysisResults;
+  imageUrl?: string;
   error?: string;
   createdAt: string;
   updatedAt: string;

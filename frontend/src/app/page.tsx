@@ -1,27 +1,22 @@
 import { UploadZone } from "@/components/upload-zone";
-import { Activity, ShieldCheck, Zap } from "lucide-react";
+import { Activity, ShieldCheck, Zap, ArrowRight } from "lucide-react";
 
 export default function Home() {
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden">
-      {/* Background styling elements */}
-      <div className="absolute top-0 inset-x-0 h-[500px] bg-gradient-to-b from-primary/20 to-transparent pointer-events-none -z-10" />
-      <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary/20 blur-[100px] rounded-full pointer-events-none -z-10" />
-      <div className="absolute top-40 -left-40 w-96 h-96 bg-blue-500/10 blur-[100px] rounded-full pointer-events-none -z-10" />
-
-      <main className="flex-1 container max-w-6xl mx-auto px-4 py-12 md:py-24 flex flex-col items-center">
+    <div className="min-h-screen flex flex-col relative overflow-hidden bg-background">
+      <main className="flex-1 container max-w-6xl mx-auto px-4 py-16 md:py-32 flex flex-col items-center">
         
         {/* Header Section */}
-        <div className="text-center mb-16 space-y-4 max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 border border-primary/20">
-            <Zap className="w-4 h-4" />
-            <span>AI-Powered Pipeline</span>
+        <div className="text-center mb-16 space-y-6 max-w-3xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-secondary/50 text-foreground text-xs font-semibold mb-2 border border-border">
+            <Zap className="w-3.5 h-3.5" />
+            <span>Enterprise Media Processing</span>
           </div>
-          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight lg:leading-tight text-foreground">
-            Intelligent Media <br className="hidden md:block" /> Processing
+          <h1 className="text-5xl md:text-7xl font-bold tracking-tighter lg:leading-[1.1] text-foreground">
+            Intelligent Media <br className="hidden md:block" /> Pipeline
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground">
-            Automated quality checks, blur detection, OCR, and tampering analysis for vehicle imagery in milliseconds.
+          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto font-medium">
+            Automated quality checks, blur detection, AI-powered OCR, and advanced tampering heuristics in milliseconds.
           </p>
         </div>
 
@@ -31,30 +26,35 @@ export default function Home() {
         </div>
 
         {/* Features Section */}
-        <div className="grid md:grid-cols-3 gap-8 w-full max-w-5xl">
-          <div className="p-6 rounded-2xl bg-card border border-border flex flex-col items-center text-center space-y-3">
-            <div className="w-12 h-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center mb-2">
-              <Activity className="w-6 h-6" />
+        <div className="grid md:grid-cols-3 gap-6 w-full max-w-5xl">
+          {[
+            {
+              icon: <Activity className="w-5 h-5" />,
+              title: "Quality Metrics",
+              desc: "Instant Laplacian blur detection and brightness analysis to ensure optimal image clarity."
+            },
+            {
+              icon: <Zap className="w-5 h-5" />,
+              title: "Plate Extraction",
+              desc: "Advanced Tesseract-based text recognition tuned for Indian vehicle registration plates."
+            },
+            {
+              icon: <ShieldCheck className="w-5 h-5" />,
+              title: "Tamper Detection",
+              desc: "Heuristics to identify screenshots, exact duplicates, and metadata tampering."
+            }
+          ].map((feature, i) => (
+            <div key={i} className="group p-6 rounded-xl bg-card border border-border flex flex-col space-y-3 hover:border-foreground/30 transition-colors">
+              <div className="w-10 h-10 bg-secondary text-foreground rounded-lg flex items-center justify-center mb-2 border border-border">
+                {feature.icon}
+              </div>
+              <h3 className="font-semibold text-lg tracking-tight text-foreground">{feature.title}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">{feature.desc}</p>
+              <div className="pt-2 flex items-center text-xs font-semibold text-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                Learn more <ArrowRight className="w-3 h-3 ml-1" />
+              </div>
             </div>
-            <h3 className="font-semibold text-lg">Quality Metrics</h3>
-            <p className="text-sm text-muted-foreground">Instant Laplacian blur detection and brightness analysis to ensure optimal image clarity.</p>
-          </div>
-          
-          <div className="p-6 rounded-2xl bg-card border border-border flex flex-col items-center text-center space-y-3">
-            <div className="w-12 h-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center mb-2">
-              <span className="font-bold font-mono">OCR</span>
-            </div>
-            <h3 className="font-semibold text-lg">Number Plate Extraction</h3>
-            <p className="text-sm text-muted-foreground">Advanced Tesseract-based text recognition tuned specifically for vehicle registration plates.</p>
-          </div>
-
-          <div className="p-6 rounded-2xl bg-card border border-border flex flex-col items-center text-center space-y-3">
-            <div className="w-12 h-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center mb-2">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
-            <h3 className="font-semibold text-lg">Tamper Detection</h3>
-            <p className="text-sm text-muted-foreground">Heuristics to identify screenshots, exact duplicates, and metadata tampering.</p>
-          </div>
+          ))}
         </div>
       </main>
     </div>

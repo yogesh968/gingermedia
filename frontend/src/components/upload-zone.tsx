@@ -84,7 +84,7 @@ export function UploadZone() {
   };
 
   return (
-    <Card className="w-full max-w-2xl mx-auto overflow-hidden bg-card/50 backdrop-blur-xl border-white/10 shadow-2xl">
+    <Card className="w-full max-w-2xl mx-auto overflow-hidden bg-card border-border">
       <div className="p-6 md:p-8">
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-foreground">Upload Vehicle Image</h2>
@@ -97,17 +97,17 @@ export function UploadZone() {
           <div
             {...getRootProps()}
             className={cn(
-              "border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all duration-300 ease-in-out flex flex-col items-center justify-center min-h-[300px]",
-              isDragActive ? "border-primary bg-primary/10" : "border-border hover:border-primary/50 hover:bg-muted/50",
+              "border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all duration-200 flex flex-col items-center justify-center min-h-[300px]",
+              isDragActive ? "border-foreground/40 bg-secondary" : "border-border hover:border-foreground/30 hover:bg-secondary/50",
               isDragReject && "border-destructive bg-destructive/10"
             )}
           >
             <input {...getInputProps()} />
-            <div className="bg-primary/10 p-4 rounded-full mb-4">
-              <UploadCloud className="w-8 h-8 text-primary" />
+            <div className="bg-secondary p-4 rounded-full mb-4 border border-border">
+              <UploadCloud className="w-8 h-8 text-muted-foreground" />
             </div>
             {isDragActive ? (
-              <p className="text-lg font-medium text-primary">Drop the image here...</p>
+              <p className="text-lg font-medium text-foreground">Drop the image here...</p>
             ) : isDragReject ? (
               <p className="text-lg font-medium text-destructive">Unsupported file type</p>
             ) : (
@@ -123,7 +123,7 @@ export function UploadZone() {
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="relative rounded-2xl overflow-hidden border border-border bg-black/50 aspect-video flex items-center justify-center group">
+            <div className="relative rounded-xl overflow-hidden border border-border bg-secondary aspect-video flex items-center justify-center group">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={preview!}
@@ -133,7 +133,7 @@ export function UploadZone() {
               {!uploadMutation.isPending && (
                 <button
                   onClick={clearFile}
-                  className="absolute top-4 right-4 bg-black/60 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive"
+                  className="absolute top-3 right-3 bg-secondary text-foreground p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive hover:text-white border border-border"
                   title="Remove image"
                 >
                   <X className="w-4 h-4" />
@@ -141,17 +141,17 @@ export function UploadZone() {
               )}
               
               {uploadMutation.isPending && (
-                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center p-8">
-                  <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
+                <div className="absolute inset-0 bg-background/90 flex flex-col items-center justify-center p-8">
+                  <Loader2 className="w-8 h-8 text-muted-foreground animate-spin mb-4" />
                   <p className="text-lg font-medium mb-4">Uploading... {uploadProgress}%</p>
                   <Progress value={uploadProgress} className="w-full max-w-xs h-2" />
                 </div>
               )}
             </div>
 
-            <div className="flex items-center justify-between bg-muted/30 p-4 rounded-xl border border-border/50">
+            <div className="flex items-center justify-between bg-secondary p-4 rounded-lg border border-border">
               <div className="flex items-center gap-3 truncate">
-                <FileImage className="w-5 h-5 text-primary shrink-0" />
+                <FileImage className="w-5 h-5 text-muted-foreground shrink-0" />
                 <div className="truncate">
                   <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
                   <p className="text-xs text-muted-foreground">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>

@@ -1,36 +1,25 @@
 import { prisma } from '../../prisma/client';
 import { processingQueue } from '../../queues/processing.queue';
 import { logger } from '../../config/logger';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { config } from '../../config';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
-
-const s3Client = new S3Client({
-  region: config.AWS_REGION || 'us-east-1',
-  credentials: {
-    accessKeyId: config.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: config.AWS_SECRET_ACCESS_KEY || '',
-    ...(config.AWS_SESSION_TOKEN && { sessionToken: config.AWS_SESSION_TOKEN }),
-  },
-});
+import fs from 'fs';
 
 export class UploadService {
   async handleUpload(file: Express.Multer.File) {
     const uniqueSuffix = `${uuidv4()}${path.extname(file.originalname)}`;
-    const bucketName = config.AWS_BUCKET_NAME || 'ginger-media-bucket';
+    
+    // Ensure uploads directory exists
+    const uploadsDir = path.join(process.cwd(), 'uploads');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
 
-    // Upload to S3
-    await s3Client.send(
-      new PutObjectCommand({
-        Bucket: bucketName,
-        Key: uniqueSuffix,
-        Body: file.buffer,
-        ContentType: file.mimetype,
-      })
-    );
+    // Save locally
+    const filePath = path.join(uploadsDir, uniqueSuffix);
+    await fs.promises.writeFile(filePath, file.buffer);
 
-    const s3Url = `https://${bucketName}.s3.${config.AWS_REGION || 'us-east-1'}.amazonaws.com/${uniqueSuffix}`;
+    const localUrl = `http://localhost:${process.env.PORT || 3000}/uploads/${uniqueSuffix}`;
 
     const media = await prisma.media.create({
       data: {
@@ -44,9 +33,10 @@ export class UploadService {
 
     logger.info({ mediaId: media.id }, 'Media record created, adding to queue');
 
+    // Passing the local URL instead of S3 URL
     await processingQueue.add('process-image', {
       mediaId: media.id,
-      filePath: s3Url,
+      filePath: localUrl, 
     });
 
     return {

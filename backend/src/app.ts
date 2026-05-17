@@ -19,11 +19,16 @@ app.use(cors({
 }));
 app.use(express.json());
 
+import path from 'path';
+
 // Request logging middleware
 app.use((req, res, next) => {
   logger.info({ method: req.method, url: req.url }, 'Incoming request');
   next();
 });
+
+// Serve local uploads
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Swagger Setup
 const swaggerOptions = {
