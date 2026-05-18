@@ -9,14 +9,12 @@ async function getMediaWithLocalUrl(media: any) {
 
 export const getStatus = async (req: Request, res: Response) => {
   const { id } = req.params;
-
   const media = await prisma.media.findUnique({
     where: { id },
     include: {
       analysis: true,
     },
   });
-
   if (!media) {
     return res.status(404).json({ error: 'Media not found' });
   }
@@ -36,7 +34,7 @@ export const getResults = async (req: Request, res: Response) => {
   });
 
   if (!media) {
-    return res.status(404).json({ error: 'Media not found' });
+    return res.status(404).json({ error: 'Media not found do it again ' });
   }
 
   const mediaWithUrl = await getMediaWithLocalUrl(media);
