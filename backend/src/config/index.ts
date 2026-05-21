@@ -20,6 +20,7 @@ const envSchema = z.object({
   AWS_SESSION_TOKEN: z.string().optional(),
   AWS_REGION: z.string().optional(),
   AWS_BUCKET_NAME: z.string().optional(),
+  OCR_SPACE_API_KEY: z.string().optional(),
   FRONTEND_URL: z.string().default('http://localhost:3001'),
 });
 

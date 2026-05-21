@@ -1,6 +1,5 @@
-import { createWorker, PSM } from 'tesseract.js';
+import axios from 'axios';
 import { logger } from '../../../config/logger';
-import os from 'os';
 import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
@@ -8,98 +7,74 @@ import sharp from 'sharp';
 export class OCRService {
 
   /**
-   * Preprocess image with Sharp to significantly improve OCR accuracy:
-   * - Convert to grayscale
-   * - Upscale to at least 1200px wide (Tesseract works best on larger images)
-   * - Apply sharpening and normalise contrast
-   * - Save as PNG (lossless) to avoid JPEG artefacts hurting OCR
+   * Preprocess image with Sharp to significantly improve OCR accuracy.
+   * Upscale, grayscale, normalize contrast, sharpen, output as PNG.
    */
-  private async preprocessForOCR(imagePath: string): Promise<string> {
-    const outPath = imagePath + '_ocr_preprocessed.png';
+  private async preprocessForOCR(imagePath: string): Promise<Buffer> {
     try {
       const meta = await sharp(imagePath).metadata();
       const width = meta.width || 800;
-      // Upscale to at least 2000px wide for small number plates
       const targetWidth = Math.max(2000, width * 2);
 
-      await sharp(imagePath)
+      return await sharp(imagePath)
         .resize(targetWidth, null, { withoutEnlargement: false })
         .grayscale()
         .normalize()
         .sharpen({ sigma: 1.5, m1: 1.0, m2: 2.0 })
         .png()
-        .toFile(outPath);
-      return outPath;
+        .toBuffer();
     } catch (err) {
       logger.warn(err, 'OCR preprocessing failed, using original image');
-      return imagePath;
+      return fs.readFileSync(imagePath);
     }
   }
 
   async extractText(imagePath: string): Promise<string> {
-    let worker: Awaited<ReturnType<typeof createWorker>> | null = null;
-    let preprocessedPath: string | null = null;
-
     try {
-      // Preprocess image before OCR for much better accuracy
-      preprocessedPath = await this.preprocessForOCR(imagePath);
+      // Preprocess for much better accuracy
+      const imageBuffer = await this.preprocessForOCR(imagePath);
+      const base64 = imageBuffer.toString('base64');
 
-      const tmpDir = os.tmpdir();
+      // OCR.space free API - reliable HTTP-based OCR, works on Vercel serverless
+      const apiKey = process.env.OCR_SPACE_API_KEY || 'helloworld';
 
-      // Try to copy bundled eng.traineddata to /tmp if present
-      const possibleSources = [
-        path.join(process.cwd(), 'eng.traineddata'),
-        path.join(__dirname, '../../../../eng.traineddata'),
-        path.join(__dirname, '../../../../../eng.traineddata'),
-      ];
-      const tmpDataPath = path.join(tmpDir, 'eng.traineddata');
+      const formData = new URLSearchParams();
+      formData.append('base64Image', `data:image/png;base64,${base64}`);
+      formData.append('language', 'eng');
+      formData.append('isOverlayRequired', 'false');
+      formData.append('OCREngine', '2');         // Engine 2 is best for printed/licence plate text
+      formData.append('scale', 'true');           // Let OCR.space also scale internally
+      formData.append('isTable', 'false');
 
-      if (!fs.existsSync(tmpDataPath)) {
-        for (const src of possibleSources) {
-          if (fs.existsSync(src)) {
-            logger.info(`Copying eng.traineddata from ${src} to ${tmpDataPath}`);
-            fs.copyFileSync(src, tmpDataPath);
-            break;
-          }
+      const response = await axios.post(
+        'https://api.ocr.space/parse/image',
+        formData.toString(),
+        {
+          headers: {
+            apikey: apiKey,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          timeout: 20000,
         }
+      );
+
+      const result = response.data;
+
+      if (result?.IsErroredOnProcessing) {
+        logger.error({ error: result.ErrorMessage }, 'OCR.space API error');
+        return '';
       }
 
-      const dataExists = fs.existsSync(tmpDataPath);
-      logger.info({ dataExists, tmpDataPath }, 'Tesseract data path status');
-
-      // Use 'write' so Tesseract can download from CDN if not bundled
-      worker = await createWorker('eng', 1, {
-        langPath: tmpDir,
-        cacheMethod: dataExists ? 'readOnly' : 'write',
-      });
-
-      // Run OCR with multiple PSM modes and pick the best result
-      const results: string[] = [];
-
-      const modes = [PSM.SPARSE_TEXT, PSM.AUTO, PSM.SINGLE_LINE];
-      for (const mode of modes) {
-        await worker.setParameters({ tessedit_pageseg_mode: mode });
-        const { data: { text } } = await worker.recognize(preprocessedPath);
-        const trimmed = text.trim();
-        if (trimmed.length > 0) results.push(trimmed);
+      if (result?.ParsedResults && result.ParsedResults.length > 0) {
+        const text = result.ParsedResults[0].ParsedText || '';
+        logger.info({ text }, 'OCR.space result');
+        return text.trim();
       }
 
-      // Return the longest text found across all modes (most characters detected)
-      const bestResult = results.sort((a, b) => b.length - a.length)[0] || '';
-      logger.info({ bestResult, modesTriedCount: modes.length }, 'OCR result');
-      return bestResult;
-
+      return '';
     } catch (error) {
       logger.error(error, 'OCR Extraction failed');
       return '';
-    } finally {
-      if (worker) {
-        try { await worker.terminate(); } catch (_) {}
-      }
-      // Cleanup preprocessed temp file
-      if (preprocessedPath && preprocessedPath !== imagePath && fs.existsSync(preprocessedPath)) {
-        try { fs.unlinkSync(preprocessedPath); } catch (_) {}
-      }
     }
   }
 
@@ -110,26 +85,28 @@ export class OCRService {
 
     const upper = text.toUpperCase();
 
-    // Fix common OCR misreads: O→0, I→1, S→5, Z→2, B→8, Q→0
+    // Fix common OCR misreads for number plates
     const corrected = upper
-      .replace(/O/g, '0')
-      .replace(/I(?=[0-9])/g, '1')
-      .replace(/S(?=[0-9])/g, '5')
-      .replace(/Z(?=[0-9])/g, '2')
-      .replace(/B(?=[0-9])/g, '8');
+      .replace(/\bO\b/g, '0')
+      .replace(/(?<=[A-Z]{2}\d{1,2}[A-Z]{1,3})O/g, '0')
+      .replace(/(?<=\d)O(?=\d)/g, '0')
+      .replace(/(?<=\d)I(?=\d)/g, '1')
+      .replace(/(?<=\d)S(?=\d)/g, '5')
+      .replace(/(?<=\d)Z(?=\d)/g, '2')
+      .replace(/(?<=\d)B(?=\d)/g, '8');
 
-    // Clean: keep only alphanumeric characters
+    // Clean to alphanumeric only
     const clean = corrected.replace(/[^A-Z0-9]/g, '');
     const cleanOriginal = upper.replace(/[^A-Z0-9]/g, '');
 
-    // Standard Indian plate regex: e.g. MH12AB3456
-    const strictRegex = /[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{4}/g;
+    // Standard Indian plate: MH12AB3456 or TN87C5106
+    const strictRegex = /[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{4}/g;
 
-    let matches = clean.match(strictRegex) || cleanOriginal.match(strictRegex);
-    
-    // Lenient fallback: 2 letters, some chars, 4 digits
+    let matches: string[] | null = clean.match(strictRegex) || cleanOriginal.match(strictRegex);
+
+    // Lenient fallback
     if (!matches || matches.length === 0) {
-      const lenientRegex = /[A-Z]{2}[A-Z0-9]{1,5}[0-9]{4}/g;
+      const lenientRegex = /[A-Z]{2}[A-Z0-9]{1,6}\d{4}/g;
       matches = clean.match(lenientRegex) || cleanOriginal.match(lenientRegex) || null;
     }
 
