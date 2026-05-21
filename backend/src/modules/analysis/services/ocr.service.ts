@@ -1,9 +1,12 @@
 import { createWorker, PSM } from 'tesseract.js';
 import { logger } from '../../../config/logger';
+import os from 'os';
 
 export class OCRService {
   async extractText(imagePath: string): Promise<string> {
-    const worker = await createWorker('eng');
+    const worker = await createWorker('eng', 1, {
+      langPath: os.tmpdir(),
+    });
     try {
       await worker.setParameters({
         tessedit_pageseg_mode: PSM.SPARSE_TEXT,
