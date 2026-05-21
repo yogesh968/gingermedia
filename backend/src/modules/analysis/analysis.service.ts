@@ -34,7 +34,7 @@ export class AnalysisService {
     const blurFallback = { score: 0, confidence: 0, isBlurry: false };
     const brightnessFallback = { score: 128, isLowLight: false, isOverexposed: false };
     const ocrFallback = '';
-    const heuristicsFallback = { dimensions: { width: 0, height: 0 }, isScreenshot: false, isTampered: false, format: 'unknown', aspectRatio: 1, qualityThresholdMet: false };
+    const heuristicsFallback = { dimensions: { width: 0, height: 0 }, isScreenshot: false, isTampered: false, format: undefined as any, aspectRatio: 1, qualityThresholdMet: false };
     const hashFallback = '0000000000000000';
 
     // Run all steps in parallel, each with independent timeout + error handling

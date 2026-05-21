@@ -27,7 +27,7 @@ export declare class AnalysisService {
                 };
                 isScreenshot: boolean;
                 isTampered: boolean;
-                format: keyof import("sharp").FormatEnum | undefined;
+                format: any;
                 aspectRatio: number;
                 qualityThresholdMet: boolean;
             };

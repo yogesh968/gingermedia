@@ -1,12 +1,20 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OCRService = void 0;
 const tesseract_js_1 = require("tesseract.js");
 const logger_1 = require("../../../config/logger");
+const os_1 = __importDefault(require("os"));
 class OCRService {
     async extractText(imagePath) {
-        const worker = await (0, tesseract_js_1.createWorker)('eng');
+        let worker = null;
         try {
+            worker = await (0, tesseract_js_1.createWorker)('eng', 1, {
+                langPath: os_1.default.tmpdir(),
+                cacheMethod: 'readOnly',
+            });
             await worker.setParameters({
                 tessedit_pageseg_mode: tesseract_js_1.PSM.SPARSE_TEXT,
             });
@@ -18,12 +26,15 @@ class OCRService {
             return '';
         }
         finally {
-            await worker.terminate();
+            if (worker) {
+                try {
+                    await worker.terminate();
+                }
+                catch (_) { }
+            }
         }
     }
     validateIndianPlate(text) {
-        // Regex for Indian Plate formats allowing OCR errors: MH12AB1234, DL01C4321
-        // Allows 0 instead of Q/O in series, and letters instead of numbers in digits
         const plateRegex = /[A-Z]{2}[0-9OIQ]{1,2}[A-Z0-9]{1,3}[0-9OIZSB]{4}/g;
         const matches = text.toUpperCase().replace(/[^A-Z0-9]/g, '').match(plateRegex);
         return {
