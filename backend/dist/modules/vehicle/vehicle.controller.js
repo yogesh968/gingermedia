@@ -5,7 +5,10 @@ const client_1 = require("../../prisma/client");
 async function getMediaWithLocalUrl(media) {
     if (!media)
         return media;
-    const localUrl = `http://localhost:${process.env.PORT || 3000}/uploads/${media.filename}`;
+    // Use relative path mapped by vercel.json in production, absolute localhost in dev
+    const isProd = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+    const baseUrl = isProd ? '/_/backend' : `http://localhost:${process.env.PORT || 3000}`;
+    const localUrl = `${baseUrl}/uploads/${media.filename}`;
     return { ...media, imageUrl: localUrl };
 }
 const getStatus = async (req, res) => {
