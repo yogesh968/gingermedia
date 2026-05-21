@@ -7,6 +7,10 @@ async function getMediaWithLocalUrl(media) {
         return media;
     // Use relative path mapped by vercel.json in production, absolute localhost in dev
     const isProd = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+    // For Vercel, since /tmp is ephemeral, use the base64 image saved in rawResult
+    if (isProd && media.analysis?.rawResult?.base64Image) {
+        return { ...media, imageUrl: `data:image/jpeg;base64,${media.analysis.rawResult.base64Image}` };
+    }
     const baseUrl = isProd ? '/_/backend' : `http://localhost:${process.env.PORT || 3000}`;
     const localUrl = `${baseUrl}/uploads/${media.filename}`;
     return { ...media, imageUrl: localUrl };

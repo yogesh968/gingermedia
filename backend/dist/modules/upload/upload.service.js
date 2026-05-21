@@ -11,6 +11,7 @@ const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const os_1 = __importDefault(require("os"));
 const analysis_service_1 = require("../analysis/analysis.service");
+const sharp_1 = __importDefault(require("sharp"));
 const analysisService = new analysis_service_1.AnalysisService();
 // Master timeout: 55s to safely stay within Vercel's 60s limit
 const MASTER_TIMEOUT_MS = 55000;
@@ -38,6 +39,24 @@ class UploadService {
         const analysisPromise = analysisService.runAllChecks(media.id, filePath);
         const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), MASTER_TIMEOUT_MS));
         const results = await Promise.race([analysisPromise, timeoutPromise]);
+        // Generate base64 string for Vercel persistent display
+        let base64Image = '';
+        try {
+            const compressedBuffer = await (0, sharp_1.default)(file.buffer)
+                .resize(800, null, { withoutEnlargement: true })
+                .jpeg({ quality: 80 })
+                .toBuffer();
+            base64Image = compressedBuffer.toString('base64');
+        }
+        catch (err) {
+            logger_1.logger.warn(err, 'Failed to generate base64 image preview');
+        }
+        if (results && results !== null) {
+            // Inject base64 into rawResult
+            if (results.rawResult) {
+                results.rawResult.base64Image = base64Image;
+            }
+        }
         // If master timeout fired, mark as failed
         if (results === null) {
             logger_1.logger.error({ mediaId: media.id }, 'Analysis timed out at master level');
@@ -68,8 +87,8 @@ class UploadService {
                 }),
             ]);
             logger_1.logger.info({ mediaId: media.id }, 'Analysis completed and saved');
-            // Cleanup tmp file
-            fs_1.default.unlink(filePath, () => { });
+            // Cleanup tmp file (Disabled on Vercel to allow the frontend to fetch the image from the warm instance)
+            // fs.unlink(filePath, () => {});
             return { processingId: media.id, status: 'COMPLETED' };
         }
         catch (error) {

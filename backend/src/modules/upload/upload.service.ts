@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import { AnalysisService } from '../analysis/analysis.service';
+import sharp from 'sharp';
 
 const analysisService = new AnalysisService();
 
@@ -43,6 +44,25 @@ export class UploadService {
     );
 
     const results = await Promise.race([analysisPromise, timeoutPromise]);
+
+    // Generate base64 string for Vercel persistent display
+    let base64Image = '';
+    try {
+      const compressedBuffer = await sharp(file.buffer)
+        .resize(800, null, { withoutEnlargement: true })
+        .jpeg({ quality: 80 })
+        .toBuffer();
+      base64Image = compressedBuffer.toString('base64');
+    } catch (err) {
+      logger.warn(err, 'Failed to generate base64 image preview');
+    }
+
+    if (results && results !== null) {
+      // Inject base64 into rawResult
+      if (results.rawResult) {
+        (results.rawResult as any).base64Image = base64Image;
+      }
+    }
 
     // If master timeout fired, mark as failed
     if (results === null) {
