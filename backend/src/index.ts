@@ -2,8 +2,6 @@ import app from './app';
 import { config } from './config';
 import { logger } from './config/logger';
 import { prisma } from './prisma/client';
-import './workers/processing.worker'; // Initialize worker
-
 const start = async () => {
   try {
     // Check DB connection

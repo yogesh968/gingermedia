@@ -1,1 +1,1 @@
-import './workers/processing.worker';
+export {};

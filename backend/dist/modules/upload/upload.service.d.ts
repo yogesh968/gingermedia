@@ -1,6 +1,11 @@
 export declare class UploadService {
     handleUpload(file: Express.Multer.File): Promise<{
         processingId: string;
-        status: import(".prisma/client").$Enums.ProcessingStatus;
+        status: string;
+        error?: undefined;
+    } | {
+        processingId: string;
+        status: string;
+        error: string;
     }>;
 }

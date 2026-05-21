@@ -7,7 +7,6 @@ const app_1 = __importDefault(require("./app"));
 const config_1 = require("./config");
 const logger_1 = require("./config/logger");
 const client_1 = require("./prisma/client");
-require("./workers/processing.worker"); // Initialize worker
 const start = async () => {
     try {
         // Check DB connection
