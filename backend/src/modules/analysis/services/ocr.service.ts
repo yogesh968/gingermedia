@@ -8,17 +8,12 @@ export class OCRService {
 
   private async preprocessForOCR(imagePath: string): Promise<Buffer> {
     try {
-      const meta = await sharp(imagePath).metadata();
-      const width = meta.width || 800;
-      // Cap at 1500px to stay under OCR.space 1MB base64 limit
-      const targetWidth = Math.min(Math.max(1500, width * 2), 1500);
-
       return await sharp(imagePath)
-        .resize(targetWidth, null, { withoutEnlargement: false })
+        .resize(1200, null, { withoutEnlargement: false })
         .grayscale()
         .normalize()
         .sharpen({ sigma: 1.5, m1: 1.0, m2: 2.0 })
-        .png({ compressionLevel: 6 })
+        .jpeg({ quality: 85 })
         .toBuffer();
     } catch (err) {
       logger.warn(err, 'OCR preprocessing failed, using original image');
@@ -29,23 +24,18 @@ export class OCRService {
   async extractText(imagePath: string): Promise<string> {
     try {
       const imageBuffer = await this.preprocessForOCR(imagePath);
-
-      // Enforce 1MB limit for OCR.space free tier
-      if (imageBuffer.length > 1000000) {
-        logger.warn('Preprocessed image too large for OCR.space, skipping OCR');
-        return '';
-      }
-
       const base64 = imageBuffer.toString('base64');
       const apiKey = config.OCR_SPACE_API_KEY || 'helloworld';
 
+      logger.info({ apiKey: apiKey.slice(0, 5), bufferSize: imageBuffer.length }, 'OCR starting');
+
       const formData = new URLSearchParams();
-      formData.append('base64Image', `data:image/png;base64,${base64}`);
+      formData.append('base64Image', `data:image/jpeg;base64,${base64}`);
       formData.append('language', 'eng');
       formData.append('isOverlayRequired', 'false');
       formData.append('OCREngine', '2');
       formData.append('scale', 'true');
-      formData.append('isTable', 'false');
+      formData.append('filetype', 'jpg');
 
       const response = await axios.post(
         'https://api.ocr.space/parse/image',
@@ -55,11 +45,14 @@ export class OCRService {
             apikey: apiKey,
             'Content-Type': 'application/x-www-form-urlencoded',
           },
-          timeout: 25000,
+          timeout: 30000,
+          maxContentLength: 10 * 1024 * 1024,
+          maxBodyLength: 10 * 1024 * 1024,
         }
       );
 
       const result = response.data;
+      logger.info({ result }, 'OCR.space raw response');
 
       if (result?.IsErroredOnProcessing) {
         logger.error({ error: result.ErrorMessage }, 'OCR.space API error');
