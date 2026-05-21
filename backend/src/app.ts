@@ -20,6 +20,7 @@ app.use(cors({
 app.use(express.json());
 
 import path from 'path';
+import os from 'os';
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -27,8 +28,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve local uploads
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+// Serve local uploads from tmp for serverless
+app.use('/uploads', express.static(path.join(os.tmpdir(), 'uploads')));
 
 // Swagger Setup
 const swaggerOptions = {

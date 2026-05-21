@@ -6,6 +6,7 @@ import { AnalysisService } from '../modules/analysis/analysis.service';
 import { logger } from '../config/logger';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 const analysisService = new AnalysisService();
 
@@ -25,7 +26,7 @@ export const processingWorker = new Worker(
 
       // Extract filename from the local URL (e.g. http://localhost:3000/uploads/uuid.webp)
       const filename = filePath.split('/').pop();
-      const localFilePath = path.join(process.cwd(), 'uploads', filename);
+      const localFilePath = path.join(os.tmpdir(), 'uploads', filename);
 
       if (!fs.existsSync(localFilePath)) {
         throw new Error(`File not found: ${localFilePath}`);

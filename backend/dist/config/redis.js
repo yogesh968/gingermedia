@@ -6,7 +6,7 @@ exports.redisConnection = {
     host: index_1.config.REDIS_HOST,
     port: index_1.config.REDIS_PORT,
     password: index_1.config.REDIS_PASSWORD,
-    ...(index_1.config.REDIS_PASSWORD ? { tls: {} } : {}),
+    tls: index_1.config.REDIS_HOST?.includes('upstash.io') ? {} : undefined,
     maxRetriesPerRequest: null,
 };
 //# sourceMappingURL=redis.js.map

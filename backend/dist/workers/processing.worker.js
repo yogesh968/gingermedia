@@ -10,11 +10,9 @@ const processing_queue_1 = require("../queues/processing.queue");
 const client_1 = require("../prisma/client");
 const analysis_service_1 = require("../modules/analysis/analysis.service");
 const logger_1 = require("../config/logger");
-const axios_1 = __importDefault(require("axios"));
 const fs_1 = __importDefault(require("fs"));
-const os_1 = __importDefault(require("os"));
 const path_1 = __importDefault(require("path"));
-const uuid_1 = require("uuid");
+const os_1 = __importDefault(require("os"));
 const analysisService = new analysis_service_1.AnalysisService();
 exports.processingWorker = new bullmq_1.Worker(processing_queue_1.IMAGE_PROCESSING_QUEUE, async (job) => {
     const { mediaId, filePath } = job.data;
@@ -25,21 +23,14 @@ exports.processingWorker = new bullmq_1.Worker(processing_queue_1.IMAGE_PROCESSI
             where: { id: mediaId },
             data: { status: 'PROCESSING' },
         });
-        // Download the remote S3 URL to a temporary file for analysis
-        const response = await axios_1.default.get(filePath, { responseType: 'arraybuffer' });
-        const tempFilePath = path_1.default.join(os_1.default.tmpdir(), `${(0, uuid_1.v4)()}.jpg`);
-        fs_1.default.writeFileSync(tempFilePath, Buffer.from(response.data));
-        // Run Analysis using the temporary file
-        let results;
-        try {
-            results = await analysisService.runAllChecks(mediaId, tempFilePath);
+        // Extract filename from the local URL (e.g. http://localhost:3000/uploads/uuid.webp)
+        const filename = filePath.split('/').pop();
+        const localFilePath = path_1.default.join(os_1.default.tmpdir(), 'uploads', filename);
+        if (!fs_1.default.existsSync(localFilePath)) {
+            throw new Error(`File not found: ${localFilePath}`);
         }
-        finally {
-            // Cleanup temp file
-            if (fs_1.default.existsSync(tempFilePath)) {
-                fs_1.default.unlinkSync(tempFilePath);
-            }
-        }
+        // Run Analysis using the local file
+        const results = await analysisService.runAllChecks(mediaId, localFilePath);
         // Save Analysis results and update Media status
         await client_1.prisma.$transaction([
             client_1.prisma.analysis.create({

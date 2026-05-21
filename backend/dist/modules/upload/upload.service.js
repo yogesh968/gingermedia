@@ -7,29 +7,22 @@ exports.UploadService = void 0;
 const client_1 = require("../../prisma/client");
 const processing_queue_1 = require("../../queues/processing.queue");
 const logger_1 = require("../../config/logger");
-const client_s3_1 = require("@aws-sdk/client-s3");
-const config_1 = require("../../config");
 const uuid_1 = require("uuid");
 const path_1 = __importDefault(require("path"));
-const s3Client = new client_s3_1.S3Client({
-    region: config_1.config.AWS_REGION || 'us-east-1',
-    credentials: {
-        accessKeyId: config_1.config.AWS_ACCESS_KEY_ID || '',
-        secretAccessKey: config_1.config.AWS_SECRET_ACCESS_KEY || '',
-    },
-});
+const fs_1 = __importDefault(require("fs"));
+const os_1 = __importDefault(require("os"));
 class UploadService {
     async handleUpload(file) {
         const uniqueSuffix = `${(0, uuid_1.v4)()}${path_1.default.extname(file.originalname)}`;
-        const bucketName = config_1.config.AWS_BUCKET_NAME || 'ginger-media-bucket';
-        // Upload to S3
-        await s3Client.send(new client_s3_1.PutObjectCommand({
-            Bucket: bucketName,
-            Key: uniqueSuffix,
-            Body: file.buffer,
-            ContentType: file.mimetype,
-        }));
-        const s3Url = `https://${bucketName}.s3.${config_1.config.AWS_REGION || 'us-east-1'}.amazonaws.com/${uniqueSuffix}`;
+        // Ensure uploads directory exists in /tmp for serverless environments
+        const uploadsDir = path_1.default.join(os_1.default.tmpdir(), 'uploads');
+        if (!fs_1.default.existsSync(uploadsDir)) {
+            fs_1.default.mkdirSync(uploadsDir, { recursive: true });
+        }
+        // Save locally
+        const filePath = path_1.default.join(uploadsDir, uniqueSuffix);
+        await fs_1.default.promises.writeFile(filePath, file.buffer);
+        const localUrl = `http://localhost:${process.env.PORT || 3000}/uploads/${uniqueSuffix}`;
         const media = await client_1.prisma.media.create({
             data: {
                 filename: uniqueSuffix,
@@ -40,9 +33,10 @@ class UploadService {
             },
         });
         logger_1.logger.info({ mediaId: media.id }, 'Media record created, adding to queue');
+        // Passing the local URL instead of S3 URL
         await processing_queue_1.processingQueue.add('process-image', {
             mediaId: media.id,
-            filePath: s3Url,
+            filePath: localUrl,
         });
         return {
             processingId: media.id,

@@ -21,11 +21,15 @@ app.use((0, cors_1.default)({
     credentials: true,
 }));
 app.use(express_1.default.json());
+const path_1 = __importDefault(require("path"));
+const os_1 = __importDefault(require("os"));
 // Request logging middleware
 app.use((req, res, next) => {
     logger_1.logger.info({ method: req.method, url: req.url }, 'Incoming request');
     next();
 });
+// Serve local uploads from tmp for serverless
+app.use('/uploads', express_1.default.static(path_1.default.join(os_1.default.tmpdir(), 'uploads')));
 // Swagger Setup
 const swaggerOptions = {
     definition: {

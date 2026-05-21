@@ -84,7 +84,8 @@ export function UploadZone() {
   };
 
   return (
-    <Card className="w-full max-w-2xl mx-auto overflow-hidden bg-card border-border">
+    <Card className="w-full max-w-2xl mx-auto overflow-hidden glassmorphism border-white/10 shadow-2xl relative">
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 pointer-events-none" />
       <div className="p-6 md:p-8">
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-foreground">Upload Vehicle Image</h2>
@@ -97,14 +98,14 @@ export function UploadZone() {
           <div
             {...getRootProps()}
             className={cn(
-              "border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all duration-200 flex flex-col items-center justify-center min-h-[300px]",
-              isDragActive ? "border-foreground/40 bg-secondary" : "border-border hover:border-foreground/30 hover:bg-secondary/50",
+              "border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center min-h-[300px] relative overflow-hidden group",
+              isDragActive ? "border-blue-500/50 bg-blue-500/10 shadow-[0_0_30px_rgba(59,130,246,0.15)] scale-[1.02]" : "border-white/10 hover:border-white/20 hover:bg-white/5",
               isDragReject && "border-destructive bg-destructive/10"
             )}
           >
             <input {...getInputProps()} />
-            <div className="bg-secondary p-4 rounded-full mb-4 border border-border">
-              <UploadCloud className="w-8 h-8 text-muted-foreground" />
+            <div className="bg-background/50 p-5 rounded-full mb-6 border border-white/10 shadow-inner group-hover:scale-110 transition-transform duration-300">
+              <UploadCloud className="w-10 h-10 text-blue-400 group-hover:text-blue-300 transition-colors" />
             </div>
             {isDragActive ? (
               <p className="text-lg font-medium text-foreground">Drop the image here...</p>

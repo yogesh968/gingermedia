@@ -4,13 +4,14 @@ import { logger } from '../../config/logger';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 
 export class UploadService {
   async handleUpload(file: Express.Multer.File) {
     const uniqueSuffix = `${uuidv4()}${path.extname(file.originalname)}`;
     
-    // Ensure uploads directory exists
-    const uploadsDir = path.join(process.cwd(), 'uploads');
+    // Ensure uploads directory exists in /tmp for serverless environments
+    const uploadsDir = path.join(os.tmpdir(), 'uploads');
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
