@@ -1,27 +1,24 @@
 import axios from 'axios';
 import { logger } from '../../../config/logger';
 import fs from 'fs';
-import path from 'path';
 import sharp from 'sharp';
+import { config } from '../../../config';
 
 export class OCRService {
 
-  /**
-   * Preprocess image with Sharp to significantly improve OCR accuracy.
-   * Upscale, grayscale, normalize contrast, sharpen, output as PNG.
-   */
   private async preprocessForOCR(imagePath: string): Promise<Buffer> {
     try {
       const meta = await sharp(imagePath).metadata();
       const width = meta.width || 800;
-      const targetWidth = Math.max(2000, width * 2);
+      // Cap at 1500px to stay under OCR.space 1MB base64 limit
+      const targetWidth = Math.min(Math.max(1500, width * 2), 1500);
 
       return await sharp(imagePath)
         .resize(targetWidth, null, { withoutEnlargement: false })
         .grayscale()
         .normalize()
         .sharpen({ sigma: 1.5, m1: 1.0, m2: 2.0 })
-        .png()
+        .png({ compressionLevel: 6 })
         .toBuffer();
     } catch (err) {
       logger.warn(err, 'OCR preprocessing failed, using original image');
@@ -31,19 +28,23 @@ export class OCRService {
 
   async extractText(imagePath: string): Promise<string> {
     try {
-      // Preprocess for much better accuracy
       const imageBuffer = await this.preprocessForOCR(imagePath);
-      const base64 = imageBuffer.toString('base64');
 
-      // OCR.space free API - reliable HTTP-based OCR, works on Vercel serverless
-      const apiKey = process.env.OCR_SPACE_API_KEY || 'helloworld';
+      // Enforce 1MB limit for OCR.space free tier
+      if (imageBuffer.length > 1000000) {
+        logger.warn('Preprocessed image too large for OCR.space, skipping OCR');
+        return '';
+      }
+
+      const base64 = imageBuffer.toString('base64');
+      const apiKey = config.OCR_SPACE_API_KEY || 'helloworld';
 
       const formData = new URLSearchParams();
       formData.append('base64Image', `data:image/png;base64,${base64}`);
       formData.append('language', 'eng');
       formData.append('isOverlayRequired', 'false');
-      formData.append('OCREngine', '2');         // Engine 2 is best for printed/licence plate text
-      formData.append('scale', 'true');           // Let OCR.space also scale internally
+      formData.append('OCREngine', '2');
+      formData.append('scale', 'true');
       formData.append('isTable', 'false');
 
       const response = await axios.post(
@@ -54,7 +55,7 @@ export class OCRService {
             apikey: apiKey,
             'Content-Type': 'application/x-www-form-urlencoded',
           },
-          timeout: 20000,
+          timeout: 25000,
         }
       );
 
