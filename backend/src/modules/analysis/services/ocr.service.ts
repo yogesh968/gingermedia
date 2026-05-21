@@ -3,39 +3,92 @@ import { logger } from '../../../config/logger';
 import os from 'os';
 import fs from 'fs';
 import path from 'path';
+import sharp from 'sharp';
 
 export class OCRService {
+
+  /**
+   * Preprocess image with Sharp to significantly improve OCR accuracy:
+   * - Convert to grayscale
+   * - Upscale to at least 1200px wide (Tesseract works best on larger images)
+   * - Apply sharpening and normalise contrast
+   * - Save as PNG (lossless) to avoid JPEG artefacts hurting OCR
+   */
+  private async preprocessForOCR(imagePath: string): Promise<string> {
+    const outPath = imagePath + '_ocr_preprocessed.png';
+    try {
+      const meta = await sharp(imagePath).metadata();
+      const width = meta.width || 800;
+      // Upscale to at least 2000px wide for small number plates
+      const targetWidth = Math.max(2000, width * 2);
+
+      await sharp(imagePath)
+        .resize(targetWidth, null, { withoutEnlargement: false })
+        .grayscale()
+        .normalize()
+        .sharpen({ sigma: 1.5, m1: 1.0, m2: 2.0 })
+        .png()
+        .toFile(outPath);
+      return outPath;
+    } catch (err) {
+      logger.warn(err, 'OCR preprocessing failed, using original image');
+      return imagePath;
+    }
+  }
+
   async extractText(imagePath: string): Promise<string> {
     let worker: Awaited<ReturnType<typeof createWorker>> | null = null;
+    let preprocessedPath: string | null = null;
+
     try {
-      // Vercel Serverless Function compatibility:
-      // We must trick NFT into bundling the file by using path.join(__dirname, ...)
-      const sourceDataPath = path.join(process.cwd(), 'eng.traineddata');
-      const fallbackDataPath = path.join(__dirname, '../../../../eng.traineddata');
-      
+      // Preprocess image before OCR for much better accuracy
+      preprocessedPath = await this.preprocessForOCR(imagePath);
+
       const tmpDir = os.tmpdir();
+
+      // Try to copy bundled eng.traineddata to /tmp if present
+      const possibleSources = [
+        path.join(process.cwd(), 'eng.traineddata'),
+        path.join(__dirname, '../../../../eng.traineddata'),
+        path.join(__dirname, '../../../../../eng.traineddata'),
+      ];
       const tmpDataPath = path.join(tmpDir, 'eng.traineddata');
-      
+
       if (!fs.existsSync(tmpDataPath)) {
-        if (fs.existsSync(sourceDataPath)) {
-          fs.copyFileSync(sourceDataPath, tmpDataPath);
-        } else if (fs.existsSync(fallbackDataPath)) {
-          fs.copyFileSync(fallbackDataPath, tmpDataPath);
-        } else {
-          logger.warn('eng.traineddata not found in deployment! Tesseract will attempt to download it.');
+        for (const src of possibleSources) {
+          if (fs.existsSync(src)) {
+            logger.info(`Copying eng.traineddata from ${src} to ${tmpDataPath}`);
+            fs.copyFileSync(src, tmpDataPath);
+            break;
+          }
         }
       }
 
+      const dataExists = fs.existsSync(tmpDataPath);
+      logger.info({ dataExists, tmpDataPath }, 'Tesseract data path status');
+
+      // Use 'write' so Tesseract can download from CDN if not bundled
       worker = await createWorker('eng', 1, {
         langPath: tmpDir,
-        cacheMethod: fs.existsSync(tmpDataPath) ? 'readOnly' : 'write',
+        cacheMethod: dataExists ? 'readOnly' : 'write',
       });
-      
-      await worker.setParameters({
-        tessedit_pageseg_mode: PSM.SPARSE_TEXT,
-      });
-      const { data: { text } } = await worker.recognize(imagePath);
-      return text.trim();
+
+      // Run OCR with multiple PSM modes and pick the best result
+      const results: string[] = [];
+
+      const modes = [PSM.SPARSE_TEXT, PSM.AUTO, PSM.SINGLE_LINE];
+      for (const mode of modes) {
+        await worker.setParameters({ tessedit_pageseg_mode: mode });
+        const { data: { text } } = await worker.recognize(preprocessedPath);
+        const trimmed = text.trim();
+        if (trimmed.length > 0) results.push(trimmed);
+      }
+
+      // Return the longest text found across all modes (most characters detected)
+      const bestResult = results.sort((a, b) => b.length - a.length)[0] || '';
+      logger.info({ bestResult, modesTriedCount: modes.length }, 'OCR result');
+      return bestResult;
+
     } catch (error) {
       logger.error(error, 'OCR Extraction failed');
       return '';
@@ -43,27 +96,45 @@ export class OCRService {
       if (worker) {
         try { await worker.terminate(); } catch (_) {}
       }
+      // Cleanup preprocessed temp file
+      if (preprocessedPath && preprocessedPath !== imagePath && fs.existsSync(preprocessedPath)) {
+        try { fs.unlinkSync(preprocessedPath); } catch (_) {}
+      }
     }
   }
 
   validateIndianPlate(text: string) {
-    // Relaxed regex to catch more common Indian Number Plate formats even if OCR is slightly noisy
-    const plateRegex = /[A-Z]{2}[0-9OIQ]{1,2}[A-Z0-9]{1,3}[0-9OIZSB]{4}/g;
-    const cleanText = text.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!text || text.length === 0) {
+      return { isValid: false, plates: [] };
+    }
+
+    const upper = text.toUpperCase();
+
+    // Fix common OCR misreads: O→0, I→1, S→5, Z→2, B→8, Q→0
+    const corrected = upper
+      .replace(/O/g, '0')
+      .replace(/I(?=[0-9])/g, '1')
+      .replace(/S(?=[0-9])/g, '5')
+      .replace(/Z(?=[0-9])/g, '2')
+      .replace(/B(?=[0-9])/g, '8');
+
+    // Clean: keep only alphanumeric characters
+    const clean = corrected.replace(/[^A-Z0-9]/g, '');
+    const cleanOriginal = upper.replace(/[^A-Z0-9]/g, '');
+
+    // Standard Indian plate regex: e.g. MH12AB3456
+    const strictRegex = /[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{4}/g;
+
+    let matches = clean.match(strictRegex) || cleanOriginal.match(strictRegex);
     
-    // Also try a very relaxed match if the strict one fails
-    const relaxedRegex = /[A-Z]{2}.*[0-9]{4}/; 
-    
-    let matches = cleanText.match(plateRegex);
-    let isValid = !!matches && matches.length > 0;
-    
-    if (!isValid && text.toUpperCase().replace(/[^A-Z0-9]/g, ' ').match(relaxedRegex)) {
-       matches = [text.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 10)];
-       isValid = true; // lenient fallback
+    // Lenient fallback: 2 letters, some chars, 4 digits
+    if (!matches || matches.length === 0) {
+      const lenientRegex = /[A-Z]{2}[A-Z0-9]{1,5}[0-9]{4}/g;
+      matches = clean.match(lenientRegex) || cleanOriginal.match(lenientRegex) || null;
     }
 
     return {
-      isValid,
+      isValid: !!matches && matches.length > 0,
       plates: matches || [],
     };
   }

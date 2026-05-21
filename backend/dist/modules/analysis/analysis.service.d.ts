@@ -43,6 +43,9 @@ export declare class AnalysisService {
             };
             plateValidation: {
                 isValid: boolean;
+                plates: never[];
+            } | {
+                isValid: boolean;
                 plates: [] | RegExpMatchArray;
             };
         };
