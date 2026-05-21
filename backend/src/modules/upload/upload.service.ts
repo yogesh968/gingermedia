@@ -77,8 +77,8 @@ export class UploadService {
 
       logger.info({ mediaId: media.id }, 'Analysis completed and saved');
 
-      // Cleanup tmp file
-      fs.unlink(filePath, () => {});
+      // Cleanup tmp file (Disabled on Vercel to allow the frontend to fetch the image from the warm instance)
+      // fs.unlink(filePath, () => {});
 
       return { processingId: media.id, status: 'COMPLETED' };
     } catch (error) {
